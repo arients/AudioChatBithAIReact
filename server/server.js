@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 import mediasoup from 'mediasoup';
 import dotenv from 'dotenv';
 dotenv.config();
-import axios from 'axios';
 
 // Import our in‐memory database functions
 import {
@@ -168,35 +167,16 @@ io.on('connection', (socket) => {
 
     socket.on('createProducerTransport', async ({ roomId }, callback) => {
         if (typeof callback !== 'function') return;
-
         try {
             if (!router) throw new Error('Router not initialised');
-
-            // Получение публичного IP перед созданием транспорта
-            const fetchPublicIP = async () => {
-                try {
-                    const response = await axios.get('https://api64.ipify.org?format=json');
-                    return response.data.ip;
-                } catch (error) {
-                    console.error('Error fetching public IP:', error);
-                    return '127.0.0.1'; // fallback IP
-                }
-            };
-
-            // Ждём получения IP перед созданием транспорта
-            const announcedIp = await fetchPublicIP();
-            console.log('Using ANNOUNCED_IP:', announcedIp);
-
             const transport = await router.createWebRtcTransport({
-                listenIps: [{ ip: '0.0.0.0', announcedIp }],
+                listenIps: [{ ip: '0.0.0.0', announcedIp: process.env.ANNOUNCED_IP || '127.0.0.1' }],
                 enableUdp: true,
                 enableTcp: true,
                 preferUdp: true,
                 appData: { socketId: socket.id, type: 'producer', roomId }
             });
-
             transports.set(transport.id, transport);
-
             callback({
                 id: transport.id,
                 iceParameters: transport.iceParameters,
