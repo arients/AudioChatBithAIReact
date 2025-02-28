@@ -6,6 +6,19 @@ import { fileURLToPath } from 'url';
 import mediasoup from 'mediasoup';
 import dotenv from 'dotenv';
 dotenv.config();
+import axios from 'axios';
+
+const fetchPublicIP = async () => {
+    try {
+        const response = await axios.get('https://api64.ipify.org?format=json');
+        process.env.ANNOUNCED_IP = response.data.ip;
+        console.log('Detected ANNOUNCED_IP:', process.env.ANNOUNCED_IP);
+    } catch (error) {
+        console.error('Error fetching public IP:', error);
+    }
+};
+
+fetchPublicIP();
 
 // Import our in‐memory database functions
 import {
