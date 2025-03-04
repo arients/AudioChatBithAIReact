@@ -1,279 +1,63 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import socket from './socket.jsx';
 import RoomSessionBottomButtonPanel from './RoomSessionBottomButtonPanel.jsx';
 import RoomParticipant from './RoomParticipant.jsx';
-import { Device } from 'mediasoup-client';
+import { useAudioMonitoring } from '../hooks/useAudioMonitoring';
+import { useRoomSocket } from '../hooks/useRoomSocket';
+import { useMediaSetup } from '../hooks/useMediaSetup';
+import calculateGridLayout from '../utils/calculateGridLayout.js';
+import socket from "../socket.jsx";
+import RoomAddAIMenu from "./RoomAddAIMenu.jsx";
+import RoomMenu from "./RoomMenu.jsx";
+import RoomSettingsMenu from "./RoomSettingsMenu.jsx";
+import modelSettings from '../utils/aiProperties.js';
+import RoomAIParticipant from "./RoomAIParticipant.jsx";
 
 const Room = ({ userName }) => {
     const { roomId } = useParams();
     const navigate = useNavigate();
-    const [participants, setParticipants] = useState([]);
-    const [userId, setUserId] = useState(null);
-    const [localStream, setLocalStream] = useState(null);
-    const [micEnabled, setMicEnabled] = useState(true);
-    const [remoteStreams, setRemoteStreams] = useState({});
-    const deviceRef = useRef(null);
-    const producerTransportRef = useRef(null);
-    const consumerTransportsRef = useRef(new Map());
-    const producerRef = useRef(null);
-    const joinedRef = useRef(false); // Flag to avoid double join
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+    const [isAddAIMenuOpen, setIsAddAIMenuOpen] = useState(false);
+    const [isWindowActive, setIsWindowActive] = useState(true);
 
-    // Update local participants list
-    const updateLocalParticipants = (users) => {
-        setParticipants(users || []);
-    };
+    // Состояние конфигурации AI
+    const [aiConfig, setAiConfig] = useState({
+        voice: modelSettings.voice.selected,
+        instructions: modelSettings.communicationStyle.selected,
+        temperature: modelSettings.temperature,
+    });
 
-    // After obtaining the local stream, monitor audio levels
+    // Инициализация медиапотока, девайса и продьюсера
+    const {
+        localStream,
+        micEnabled,
+        setMicEnabled,
+        deviceRef,
+        producerRef,
+        producerTransportRef,
+        restartLocalStream
+    } = useMediaSetup(roomId, isWindowActive);
+
+    // Инициализация сокет-соединения и получение данных комнаты
+    const { participants, userId, role, remoteStreams } = useRoomSocket(roomId, userName, deviceRef);
+
+    // Мониторинг уровня аудио (уже используется для обновления статуса говорящего)
+    useAudioMonitoring(localStream, isWindowActive);
+
+    // Обработка смены аудио устройств из настроек
     useEffect(() => {
-        if (localStream) {
-            const audioContext = new AudioContext();
-            const analyser = audioContext.createAnalyser();
-            const microphone = audioContext.createMediaStreamSource(localStream);
-            microphone.connect(analyser);
-            analyser.fftSize = 512;
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            let talking = false;
-            const threshold = 10;
-
-            const monitorAudio = () => {
-                analyser.getByteFrequencyData(dataArray);
-                const sum = dataArray.reduce((acc, value) => acc + value, 0);
-                const average = sum / dataArray.length;
-                if (average > threshold && !talking) {
-                    talking = true;
-                    socket.emit('updateTalkingStatus', { isTalking: true }, (response) => {
-                        if (!response.success) {
-                            console.error('Failed to update talking status to true');
-                        }
-                    });
-                } else if (average <= threshold && talking) {
-                    talking = false;
-                    socket.emit('updateTalkingStatus', { isTalking: false }, (response) => {
-                        if (!response.success) {
-                            console.error('Failed to update talking status to false');
-                        }
-                    });
-                }
-                requestAnimationFrame(monitorAudio);
-            };
-
-            monitorAudio();
-
-            return () => {
-                audioContext.close();
-            };
-        }
-    }, [localStream]);
-
-    useEffect(() => {
-        const initSocket = async () => {
-            try {
-                const id = await new Promise((resolve) => {
-                    socket.emit('getUserId', (id) => resolve(id));
-                });
-                setUserId(id);
-                // Join room only once
-                if (!joinedRef.current) {
-                    joinedRef.current = true;
-                    socket.emit('joinRoom', { roomId, userName }, (response) => {
-                        if (response.error) {
-                            alert(response.error);
-                            navigate('/');
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Error initialising socket:', error);
-            }
+        const handleAudioDeviceChange = (event) => {
+            // Перезапуск локального потока с новым устройством
+            restartLocalStream(event.detail.inputDeviceId);
         };
-        initSocket();
 
-        socket.on('updateParticipants', (users) => {
-            updateLocalParticipants(users);
-        });
-
-        socket.on('roomTerminated', () => {
-            alert('Room has been terminated by the admin.');
-            navigate('/');
-        });
-
-        socket.on('newProducer', async ({ producerId, userId: remoteUserId }) => {
-            try {
-                const transport = await createConsumerTransport();
-                if (!transport) throw new Error('Failed to create consumer transport');
-                socket.emit(
-                    'consume',
-                    {
-                        producerId,
-                        rtpCapabilities: deviceRef.current?.rtpCapabilities,
-                        transportId: transport.id
-                    },
-                    async (data) => {
-                        if (data?.error) {
-                            console.error('Failed to consume producer:', data.error);
-                            return;
-                        }
-                        const consumer = await transport.consume({
-                            id: data.id,
-                            producerId: data.producerId,
-                            kind: data.kind,
-                            rtpParameters: data.rtpParameters
-                        });
-                        const stream = new MediaStream([consumer.track]);
-                        setRemoteStreams(prev => ({ ...prev, [remoteUserId]: stream }));
-                    }
-                );
-            } catch (error) {
-                console.error('Error handling new producer:', error);
-            }
-        });
-
-        socket.on('existingProducer', async ({ producerId, userId: remoteUserId }) => {
-            try {
-                const transport = await createConsumerTransport();
-                if (!transport) throw new Error('Failed to create consumer transport');
-                socket.emit(
-                    'consume',
-                    {
-                        producerId,
-                        rtpCapabilities: deviceRef.current?.rtpCapabilities,
-                        transportId: transport.id
-                    },
-                    async (data) => {
-                        if (data?.error) {
-                            console.error('Failed to consume existing producer:', data.error);
-                            return;
-                        }
-                        const consumer = await transport.consume({
-                            id: data.id,
-                            producerId: data.producerId,
-                            kind: data.kind,
-                            rtpParameters: data.rtpParameters
-                        });
-                        const stream = new MediaStream([consumer.track]);
-                        setRemoteStreams(prev => ({ ...prev, [remoteUserId]: stream }));
-                    }
-                );
-            } catch (error) {
-                console.error('Error handling existing producer:', error);
-            }
-        });
+        window.addEventListener('audioDeviceChanged', handleAudioDeviceChange);
 
         return () => {
-            socket.off('updateParticipants');
-            socket.off('newProducer');
-            socket.off('existingProducer');
-            cleanupResources();
+            window.removeEventListener('audioDeviceChanged', handleAudioDeviceChange);
         };
-    }, [roomId, userName]);
-
-    useEffect(() => {
-        const initDeviceAndMedia = async () => {
-            try {
-                deviceRef.current = new Device();
-                const routerRtpCapabilities = await new Promise((resolve) => {
-                    socket.emit('getRouterRtpCapabilities', (caps) => resolve(caps));
-                });
-                if (!routerRtpCapabilities) throw new Error('Failed to get router RTP capabilities');
-                await deviceRef.current.load({ routerRtpCapabilities });
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    setLocalStream(stream);
-                    setMicEnabled(true);
-                    await setupProducer(stream);
-                } catch (micError) {
-                    console.error('Microphone access denied:', micError);
-                    setMicEnabled(false);
-                }
-            } catch (error) {
-                console.error('Error initialising device:', error);
-            }
-        };
-        initDeviceAndMedia();
-    }, []);
-
-    const setupProducer = async (stream) => {
-        try {
-            if (producerRef.current) {
-                producerRef.current.close();
-                producerRef.current = null;
-            }
-            if (producerTransportRef.current) {
-                producerTransportRef.current.close();
-                producerTransportRef.current = null;
-            }
-            const transport = await createProducerTransport();
-            if (!transport) throw new Error('Failed to create producer transport');
-            producerTransportRef.current = transport;
-            const producer = await transport.produce({ track: stream.getAudioTracks()[0] });
-            producerRef.current = producer;
-        } catch (error) {
-            console.error('Error setting up producer:', error);
-        }
-    };
-
-    const createProducerTransport = async () => {
-        try {
-            const data = await new Promise((resolve) => {
-                socket.emit('createProducerTransport', { roomId }, (response) => resolve(response));
-            });
-            if (!data) throw new Error('No producer transport data received');
-            const transport = deviceRef.current.createSendTransport(data);
-            transport.on('connect', ({ dtlsParameters }, callback, errback) => {
-                socket.emit('connectProducerTransport', { dtlsParameters, transportId: transport.id }, (response) => {
-                    if (response?.success) callback();
-                    else errback(new Error('Failed to connect producer transport'));
-                });
-            });
-            transport.on('produce', ({ kind, rtpParameters }, callback) => {
-                socket.emit('produce', { kind, rtpParameters, transportId: transport.id }, callback);
-            });
-            return transport;
-        } catch (error) {
-            console.error('Error creating producer transport:', error);
-            return null;
-        }
-    };
-
-    const createConsumerTransport = async () => {
-        try {
-            const data = await new Promise((resolve) => {
-                socket.emit('createConsumerTransport', { roomId }, (response) => resolve(response));
-            });
-            if (!data) throw new Error('No consumer transport data received');
-            const transport = deviceRef.current.createRecvTransport(data);
-            transport.on('connect', ({ dtlsParameters }, callback, errback) => {
-                socket.emit('connectConsumerTransport', { dtlsParameters, transportId: transport.id }, (response) => {
-                    if (response?.success) callback();
-                    else errback(new Error('Failed to connect consumer transport'));
-                });
-            });
-            consumerTransportsRef.current.set(transport.id, transport);
-            return transport;
-        } catch (error) {
-            console.error('Error creating consumer transport:', error);
-            return null;
-        }
-    };
-
-    const cleanupResources = () => {
-        if (localStream) {
-            localStream.getTracks().forEach((track) => track.stop());
-            setLocalStream(null);
-        }
-        if (producerRef.current) {
-            producerRef.current.close();
-            producerRef.current = null;
-        }
-        if (producerTransportRef.current) {
-            producerTransportRef.current.close();
-            producerTransportRef.current = null;
-        }
-        consumerTransportsRef.current.forEach((transport) => transport.close());
-        consumerTransportsRef.current.clear();
-        socket.disconnect();
-    };
+    }, [restartLocalStream]);
 
     const toggleMute = () => {
         if (localStream) {
@@ -286,6 +70,37 @@ const Room = ({ userName }) => {
                 }
             });
         }
+    };
+
+    const cleanupResources = () => {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
+
+        if (producerRef.current) {
+            producerRef.current.close();
+        }
+
+        if (producerTransportRef.current) {
+            producerTransportRef.current.close();
+        }
+
+        if (deviceRef.current?.producer) {
+            deviceRef.current.producer.close();
+        }
+
+        if (deviceRef.current?.producerTransport) {
+            deviceRef.current.producerTransport.close();
+        }
+
+        if (deviceRef.current?.consumers) {
+            Object.values(deviceRef.current.consumers).forEach(consumer => consumer.close());
+        }
+
+        if (deviceRef.current?.consumerTransports) {
+            Object.values(deviceRef.current.consumerTransports).forEach(transport => transport.close());
+        }
+        socket.disconnect();
     };
 
     const exitRoom = () => {
@@ -301,67 +116,235 @@ const Room = ({ userName }) => {
         });
     };
 
-    const calculateGridLayout = (count) => {
-        switch(count) {
-            case 1: return { gridTemplate: '1fr / 1fr' };
-            case 2: return { gridTemplate: '1fr / repeat(2, 1fr)' };
-            case 3: return {
-                gridTemplate: 'repeat(2, 1fr) / 1fr 1fr'
-            };
-            case 4: return { gridTemplate: 'repeat(2, 1fr) / repeat(2, 1fr)' };
-            default: {
-                const columns = Math.ceil(Math.sqrt(count));
-                const rows = Math.ceil(count / columns);
-                return {
-                    gridTemplate: `repeat(${rows}, 1fr) / repeat(${columns}, 1fr)`
-                };
+    // Обработка события завершения комнаты администратором
+    useEffect(() => {
+        const handleRoomTerminated = () => {
+            cleanupResources();
+            navigate('/');
+            alert("The room has been terminated by the admin.");
+        };
+
+        socket.on('roomTerminated', handleRoomTerminated);
+        return () => {
+            socket.off('roomTerminated', handleRoomTerminated);
+        };
+    }, [navigate]);
+
+    // Настройка аудио выходов для новых аудио потоков
+    useEffect(() => {
+        const applyAudioOutputDevice = async () => {
+            const selectedOutputId = localStorage.getItem('selectedOutputDeviceId');
+
+            if (selectedOutputId && typeof HTMLMediaElement.prototype.setSinkId === 'function') {
+                const audioElements = document.querySelectorAll('audio');
+
+                for (const audioEl of audioElements) {
+                    try {
+                        if (audioEl.sinkId !== selectedOutputId) {
+                            await audioEl.setSinkId(selectedOutputId);
+                        }
+                    } catch (error) {
+                        console.error('Ошибка при изменении устройства вывода:', error);
+                    }
+                }
             }
-        }
-    };
+        };
+
+        applyAudioOutputDevice();
+    }, [remoteStreams]);
 
     const gridLayout = calculateGridLayout(participants.length);
+
+    // Обработка обновления конфигурации AI
+    const updateAiConfig = (newConfig) => {
+        setAiConfig(newConfig);
+    };
+
+    const roomContainerClass = `room-container ${isMenuOpen ? 'menu-open' : ''}`;
+
     const gridStyles = {
         display: 'grid',
         gap: '10px',
         height: '100%',
-        ...gridLayout
+        ...gridLayout,
+        transition: 'all 0.3s ease'
     };
 
+    /* ======================================================================
+       Новый блок: запись аудио с обнаружением тишины и отправка на сервер
+       ====================================================================== */
+    useEffect(() => {
+        if (!localStream) return;
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let silenceTimeout = null;
+        let isRecording = false;
+
+        // Создаём новый MediaStream из аудиодорожки локального потока, чтобы не мешать другим процессам
+        const audioStream = new MediaStream(localStream.getAudioTracks());
+
+        try {
+            mediaRecorder = new MediaRecorder(audioStream);
+        } catch (error) {
+            console.error('Ошибка создания MediaRecorder:', error);
+            return;
+        }
+
+        // Собираем чанки аудио данных
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        // При остановке записи собираем данные в Blob и отправляем на сервер для транскрипции
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            audioChunks = []; // сброс чанков
+
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const arrayBuffer = reader.result;
+                socket.emit('whisperAudioToText', { roomId: roomId, audioBuffer: arrayBuffer }, (error, transcriptionText) => {
+                    if (error) {
+                        console.error('Transcription error:', error);
+                    } else {
+                        console.log('Transcription:', transcriptionText);
+                        // Здесь можно обновить UI, например, отобразить текст транскрипции
+                    }
+                });
+            };
+            reader.readAsArrayBuffer(audioBlob);
+        };
+
+        // Создаём аудио-контекст и анализатор для определения уровня громкости
+        const audioContext = new AudioContext();
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 512;
+        const source = audioContext.createMediaStreamSource(localStream);
+        source.connect(analyser);
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        // Функция для мониторинга уровня звука и управления записью
+        const monitorAudio = () => {
+            analyser.getByteFrequencyData(dataArray);
+            const sum = dataArray.reduce((acc, value) => acc + value, 0);
+            const average = sum / dataArray.length;
+            const threshold = 25; // порог для определения речи
+
+            if (average > threshold) {
+                // Если звук обнаружен, начинаем запись (если запись ещё не шла)
+                if (!isRecording) {
+                    mediaRecorder.start();
+                    isRecording = true;
+                    // Если таймер тишины был запущен, сбрасываем его
+                    if (silenceTimeout) {
+                        clearTimeout(silenceTimeout);
+                        silenceTimeout = null;
+                    }
+                } else if (silenceTimeout) {
+                    // Если запись уже идёт, сбрасываем таймер остановки
+                    clearTimeout(silenceTimeout);
+                    silenceTimeout = null;
+                }
+            } else {
+                // Если обнаружена тишина и запись идёт, запускаем таймер на 2 секунды
+                if (isRecording && !silenceTimeout) {
+                    silenceTimeout = setTimeout(() => {
+                        if (mediaRecorder.state === 'recording') {
+                            mediaRecorder.stop();
+                        }
+                        isRecording = false;
+                        silenceTimeout = null;
+                    }, 1000);
+                }
+            }
+
+            requestAnimationFrame(monitorAudio);
+        };
+
+        monitorAudio();
+
+        return () => {
+            if (silenceTimeout) clearTimeout(silenceTimeout);
+            audioContext.close();
+        };
+    }, [localStream]);
+    /* ====================================================================== */
+
+    socket.on('aiResponse', (data) => {
+        console.log('Ответ ИИ:', data.transcription); // Выводим ответ ИИ в консоль
+        const audio = new Audio("data:audio/mpeg;base64," + data.voice);
+        audio.volume = 0.3;
+        audio.play().catch(err => console.error('Ошибка при воспроизведении аудио:', err));
+    });
     return (
-        <div className="room-container">
-            <div className="participants-grid" style={gridStyles}>
-                {participants.map((participant) => (
-                    <RoomParticipant
-                        key={participant.userId}
-                        participant={participant}
-                        currentUserId={userId}
-                        micEnabled={micEnabled}
-                    />
-                ))}
-            </div>
+        <>
+            {isSettingsMenuOpen && <RoomSettingsMenu onClose={() => setIsSettingsMenuOpen(false)} />}
+            {isMenuOpen && <RoomMenu roomId={roomId} onClose={() => setIsMenuOpen(false)} participants={participants} currentUserId={userId} role={role} />}
+            {isAddAIMenuOpen && (
+                <RoomAddAIMenu
+                    roomId={roomId}
+                    onClose={() => setIsAddAIMenuOpen(false)}
+                    config={aiConfig}
+                    updateConfig={updateAiConfig}
+                    modelSettings={modelSettings}
+                />
+            )}
 
-            <div className="remote-audio">
-                {Object.entries(remoteStreams).map(([remoteUserId, stream]) => (
-                    <audio
-                        key={remoteUserId}
-                        autoPlay
-                        playsInline
-                        ref={(audio) => {
-                            if (audio && audio.srcObject !== stream) {
-                                audio.srcObject = stream;
-                            }
-                        }}
-                    />
-                ))}
-            </div>
+            <div className={roomContainerClass}>
+                <div className="participants-grid" style={gridStyles}>
+                    {participants.map((participant) => {
+                        return participant.isAI
+                            ? <RoomAIParticipant
+                                key={participant.userId}
+                                aiParticipant={participant}
+                                onMute={(id) => socket.emit('muteAI', { aiId: id, roomId: participant.roomId, micStatus: participant.micStatus })}
+                                onKick={(id) => socket.emit('kickAI', { aiId: id, roomId: participant.roomId }, (response) => {})}
+                            />
+                            : <RoomParticipant
+                                key={participant.userId}
+                                participant={participant}
+                                currentUserId={userId}
+                                micEnabled={micEnabled}
+                            />;
+                    })}
+                </div>
 
-            <RoomSessionBottomButtonPanel
-                toggleMute={toggleMute}
-                micEnabled={micEnabled}
-                exitSession={exitRoom}
-                terminateRoom={terminateRoom}
-            />
-        </div>
+                <div className="remote-audio">
+                    {Object.entries(remoteStreams).map(([remoteUserId, stream]) => (
+                        <audio
+                            key={remoteUserId}
+                            autoPlay
+                            playsInline
+                            ref={(audio) => {
+                                if (audio && audio.srcObject !== stream) {
+                                    audio.srcObject = stream;
+                                    const selectedOutputId = localStorage.getItem('selectedOutputDeviceId');
+                                    if (selectedOutputId && audio.setSinkId) {
+                                        audio.setSinkId(selectedOutputId).catch(err => {
+                                            console.error('Failed to set audio output device:', err);
+                                        });
+                                    }
+                                }
+                            }}
+                        />
+                    ))}
+                </div>
+
+                <RoomSessionBottomButtonPanel
+                    roomMenu={() => setIsMenuOpen(true)}
+                    roomSettingsMenu={() => setIsSettingsMenuOpen(true)}
+                    addAIMenu={() => setIsAddAIMenuOpen(true)}
+                    toggleMute={toggleMute}
+                    micEnabled={micEnabled}
+                    exitSession={exitRoom}
+                    terminateRoom={terminateRoom}
+                    role={role}
+                />
+            </div>
+        </>
     );
 };
 

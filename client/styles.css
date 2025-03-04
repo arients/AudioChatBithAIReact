@@ -42,24 +42,8 @@ body {
   flex-direction: column;
   gap: 12px;
 }
-.join-room-button, .name-menu-button, .back-button {
+.join-room-button, .name-menu-button {
   width: 100%;
-}
-.back-button {
-  padding: 12px;
-  font-size: 16px;
-  border-radius: 8px;
-  border: none;
-  color: white;
-  transition: background-color 0.2s, box-shadow 0.2s;
-  cursor: pointer;
-  margin-top: 10px;
-  background: #e44816;
-}
-
-.back-button:hover {
-  background: #b8340a;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .join-room-button, .name-menu-button, .menu-button {
@@ -91,7 +75,7 @@ body {
 .join-room-input, .name-menu-input {
   width: 93%;
   padding: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   border: 1px solid #ccc;
   border-radius: 5px;
   font-size: 1rem;
@@ -105,6 +89,7 @@ body {
   width: 100%;
   padding: 20px;
   box-sizing: border-box;
+  transition: all 0.3s ease;
 }
 
 /* Дополнения к CSS */
@@ -210,18 +195,95 @@ body {
   color: #4a90e2;
 }
 
-/* Нижняя панель */
 .bottom-panel {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   gap: 20px;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.center-panel {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.left-panel, .right-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.left-panel {
+  justify-content: flex-start;
+  padding-left: 20px;
+  gap: 10px;
+}
+
+.right-panel {
+  justify-content: flex-end;
+  padding-right: 20px;
+}
+
+button:hover {
+  cursor: pointer;
+}
+
+.room-settings-button {
+  padding: 12px;
+  background-color: #e5e7eb;
+  border-radius: 50%;
+  border: none;
+  transition: background-color 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.room-settings-button:hover {
+  background-color: #d1d5db;
+}
+
+.room-menu-button {
+  padding: 12px;
+  background-color: #faeeff;
+  border-radius: 50%;
+  border: none;
+  transition: background-color 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: black;
+}
+
+.room-menu-button:hover {
+  background-color: #e6d6ef;
+}
+
+.add-button {
+  padding: 12px;
+  background-color: #e1ffe3;
+  border-radius: 50%;
+  border: none;
+  transition: background-color .2s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-button:hover {
+  background-color: #cde7d3;
+}
+
+.mute-button:hover {
+  background-color: #d1d5db;
+}
+
 .mute-button {
   padding: 12px;
-  background-color: #e5e7eb; /* Серый цвет */
+  background-color: #e5e7eb;
   border-radius: 50%;
   border: none;
   transition: background-color 0.2s ease-in-out;
@@ -250,8 +312,8 @@ body {
 }
 
 .terminate-button {
-  padding: 12px;
-  background-color: #dc2626;
+  padding: 15px;
+  background-color: #ff5e5e;
   color: white;
   border-radius: 8px;
   border: none;
@@ -260,9 +322,794 @@ body {
 }
 
 .terminate-button:hover {
-  background-color: #b91c1c;
+  background-color: #e04848;
 }
 /* Дополнительные стили для плавной анимации */
 .participants-grid > * {
   transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Анимация загрузки */
+.join-room-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.join-room-button.loading {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Спиннер */
+.animate-spin {
+  animation: spin 1s linear infinite;
+  width: 20px;
+  height: 20px;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.error-message {
+  margin: 0 0 10px 0;
+  display: flex;
+  color: red;
+}
+
+.back-button {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  padding: 10px;
+  background-color: #e5e7eb;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back-button:hover {
+  background-color: #d1d5db;
+  transform: scale(1.05);
+}
+
+.back-button:active {
+  background-color: #b0b3b8;
+  transform: scale(0.95);
+}
+
+.icon {
+  width: 24px;
+  height: 24px;
+  stroke: #333;
+  transition: stroke 0.2s ease-in-out;
+}
+
+.back-button:hover .icon {
+  stroke: #111;
+}
+
+/* RoomSettingsMenu.css */
+.settings-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.settings-menu-container {
+  background-color: white;
+  border-radius: 10px;
+  padding: 20px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.settings-menu-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.settings-section {
+  margin-bottom: 20px;
+}
+
+.settings-section label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.settings-section select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  font-size: 16px;
+}
+
+.settings-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.settings-button {
+  padding: 10px 20px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+.settings-button.save {
+  background-color: #8be5a2;
+  color: white;
+}
+
+.settings-button.save:hover {
+  background-color: #77d392;
+}
+
+.settings-button.cancel {
+  background-color: #f1f1f1;
+  color: #333;
+}
+
+.settings-button.cancel:hover {
+  background-color: #e0e0e0;
+}
+
+.room-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 999;
+}
+
+/* Стили для индикатора загрузки */
+.loading-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100px;
+  text-align: center;
+  color: #666;
+}
+
+.menu-visible {
+  left: 0;
+}
+
+body.menu-open {
+  overflow: hidden;
+}
+
+/* Base styles for the menu container - initially positioned off-screen to the left */
+.room-menu-container {
+  position: fixed;
+  top: 0;
+  left: -300px; /* Start off-screen */
+  width: 300px;
+  height: 100vh;
+  background-color: #fff;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  transition: left 0.3s ease; /* Transition for the left property */
+  overflow-y: auto;
+}
+
+/* Visible state - moved into view */
+.room-menu-container.menu-visible {
+  left: 0;
+}
+
+/* Overlay background */
+.room-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* When menu is open, show the overlay with transition */
+body.menu-open .room-menu-overlay {
+  opacity: 1;
+}
+
+.room-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.room-menu-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #888;
+}
+
+.close-button:hover {
+  color: #333;
+}
+
+.participants-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+
+/* Add these styles to your existing CSS */
+.close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #888;
+  position: absolute;
+  right: 16px;
+  top: 16px;
+}
+
+.close-button:hover {
+  color: #333;
+}
+
+.participants-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+/* Redesigned participant item */
+.participant-item {
+  display: grid;
+  grid-template-columns: 50px 1fr auto auto 20px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eaeaea;
+  transition: background-color 0.2s ease;
+  position: relative;
+}
+
+.participant-item:hover {
+  background-color: #f8f8f8;
+}
+
+.participant-item.admin {
+  background-color: rgba(66, 133, 244, 0.05);
+}
+
+.participant-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  aspect-ratio: 1/1;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+}
+
+.participant-info {
+  display: flex;
+  flex-direction: column;
+  margin-left: 10px;
+}
+
+.participant-name {
+  font-weight: 500;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.admin-badge, .you-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+.admin-badge {
+  background-color: #4285F4;
+  color: white;
+}
+
+.you-badge {
+  background-color: #E8F0FE;
+  color: #1967D2;
+}
+
+.ai-permission-checkbox {
+  display: flex;
+  align-items: center;
+  margin-right: 16px;
+  font-size: 13px;
+  color: #5f6368;
+  cursor: pointer;
+}
+
+.ai-permission-checkbox input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #5f6368;
+  outline: none;
+  cursor: pointer;
+  margin-right: 6px;
+  position: relative;
+}
+
+.ai-permission-checkbox input[type="checkbox"]:checked {
+  background-color: #4285F4;
+  border-color: #4285F4;
+}
+
+.ai-permission-checkbox input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: white;
+}
+
+.ai-permission-checkbox input[type="checkbox"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.checkbox-label {
+  user-select: none;
+}
+
+.context-menu {
+  position: fixed;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  padding: 8px 0;
+  z-index: 1001;
+  min-width: 200px;
+}
+
+.context-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #3c4043;
+}
+
+.context-menu button:hover {
+  background-color: #f1f3f4;
+}
+
+.participant-label {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.participant-label h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+/* RoomAddAIMenu.css */
+
+/* Основные стили */
+.ai-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.ai-menu-container {
+  background: #fff;
+  width: 90%;
+  max-width: 400px;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
+  transform: scale(0.9);
+  transition: transform 0.3s ease-in-out;
+}
+
+.ai-menu-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Заголовок */
+h2 {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+/* Контент */
+.ai-menu-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* Элементы выбора */
+.ai-menu-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Общие стили для меток */
+.ai-menu-item label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #444;
+  margin-bottom: 6px;
+}
+
+/* Стилизация дропдауна (селекта) */
+.ai-menu-select {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  appearance: none; /* Убирает стандартные стили браузера */
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="%23555"><path d="M7 10l5 5 5-5z"></path></svg>');
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+}
+
+.ai-menu-select:hover,
+.ai-menu-select:focus {
+  border-color: #007bff;
+  outline: none;
+  background-color: #f5f9ff;
+}
+
+/* Стилизация текстового поля */
+.ai-menu-textarea {
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 1rem;
+  resize: none;
+  height: 100px;
+  transition: all 0.3s ease-in-out;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.ai-menu-textarea:focus {
+  border-color: #007bff;
+  outline: none;
+  background-color: #f5f9ff;
+}
+
+/* Ползунок температуры */
+.temperature-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.temperature-label {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 0.9rem;
+  margin-bottom: 5px;
+}
+
+.temperature-label span {
+  color: rgba(107, 114, 128, 1);
+}
+
+/* Улучшенный слайдер */
+.ai-menu-slider {
+  width: 100%;
+  appearance: none;
+  height: 6px;
+  background: linear-gradient(to right, #ddd, #007bff);
+  border-radius: 6px;
+  outline: none;
+  transition: background 0.3s;
+}
+
+.ai-menu-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #007bff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.ai-menu-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #007bff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.ai-menu-temperature-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.ai-menu-temperature-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #777;
+}
+
+/* Кнопка */
+.ai-menu-create-button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #007bff;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s ease-in-out, transform 0.2s;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+.ai-menu-create-button:hover {
+  background: #0056b3;
+  transform: translateY(-2px);
+}
+
+.ai-menu-create-button:active {
+  background: #004494;
+  transform: translateY(0);
+}
+
+.ai-settings-menu-create-button {
+  width: 100%;
+  padding: 10px;
+  background: #4a90e2;
+  color: white;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease-in-out;
+  margin-top: 15px;
+}
+
+.ai-settings-menu-create-button:hover {
+  background: #367ed2;
+}
+
+/* Кнопка закрытия */
+.ai-settings-menu-close-button {
+  width: 100%;
+  padding: 10px;
+  background: #ff7f7f; /* Мягкий цвет */
+  color: white;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease-in-out;
+  margin-top: 15px;
+}
+
+.ai-settings-menu-close-button:hover {
+  background: #eb6d6f;
+}
+
+.ai-settings-menu-generate-prompt-button {
+  width: 100%;
+  padding: 10px;
+  background: #8be5a2;
+  color: white;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease-in-out;
+  margin-top: 15px;
+}
+
+.ai-settings-menu-generate-prompt-button:hover {
+  background: #77d392;
+}
+
+/* RoomMenu.css */
+.ai-permissions {
+  margin: 15px 0 0 15px;
+}
+
+.ai-menu-close-button:hover {
+  background-color: #e0e0e0;
+}
+
+.room-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+.room-menu-container {
+  position: fixed;
+  top: 0;
+  left: -360px; /* Start off-screen */
+  width: 360px;
+  height: 100vh;
+  background-color: #fff;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  transition: left 0.3s ease; /* Transition for the left property */
+  overflow-y: auto;
+}
+
+.room-menu-container.menu-visible {
+  left: 0;
+}
+
+.room-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+body.menu-open .room-menu-overlay {
+  opacity: 1;
+}
+
+.room-menu-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #eaeaea;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.room-menu-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.permission-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 16px;
+  margin-top: 10px;
+  font-size: 14px;
+  color: #5f6368;
+  font-weight: 500;
+}
+
+.talk-ai-header {
+  margin-left: auto;
+  margin-right: 30px;
+}
+
+.hear-ai-header {
+  margin-right: 20px;
+}
+
+.ai-badge {
+  background: orange;
+  width: 35%;
+  color: white
+}
+
+.ai-participant-controls {
+  display: flex;
+  position: absolute;
+  bottom: 7px;
+  gap: 5px;
+}
+
+.ai-settings-menu-instruction-field span{
+  position: absolute;
+  right: 20px;
+  color: #999;
 }

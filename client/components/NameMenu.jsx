@@ -1,31 +1,31 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import socket from './socket.jsx';
+import socket from '../socket.jsx';
 
 const NameMenu = ({ onNameSubmit }) => {
     const [name, setName] = useState('');
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const roomId = searchParams.get('roomId');
 
     const handleSubmit = () => {
         if (name.trim() !== '') {
+            setLoading(true); // Блокируем кнопку и запускаем анимацию
             socket.emit('updateName', { userName: name }, (response) => {
-                if (response.success) {
-                    onNameSubmit(name);
-                    localStorage.setItem('userName', name);
-                    if (roomId) {
-                        socket.emit('joinRoom', { roomId, userName: name }, (res) => {
-                            if (res.error) {
-                                alert('Room does not exist.');
-                            } else {
-                                navigate(`/room/${roomId}`);
-                            }
-                        });
+                setTimeout(() => { // Имитация задержки перед обработкой ответа
+                    if (response.success) {
+                        onNameSubmit(name);
+                        localStorage.setItem('userName', name);
+                        if (roomId) {
+                            navigate(`/room/${roomId}`);
+                        } else {
+                            navigate('/');
+                        }
                     } else {
-                        navigate('/');
+                        setLoading(false);
                     }
-                }
+                }, 500);
             });
         }
     };
@@ -37,11 +37,48 @@ const NameMenu = ({ onNameSubmit }) => {
                 <input
                     type="text"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => {
+                        if (e.target.value.length <= 15) {
+                            setName(e.target.value);
+                        }
+                    }}
                     placeholder="Enter your name"
                     className="name-menu-input"
+                    disabled={loading}
                 />
-                <button className="name-menu-button" onClick={handleSubmit}>Enter</button>
+                <button
+                    className={`name-menu-button ${loading ? 'loading' : ''}`}
+                    onClick={handleSubmit}
+                    disabled={loading}
+                >
+                    {loading ? (
+                        <div className="loading-button flex items-center justify-center space-x-2">
+                            <svg
+                                className="animate-spin h-5 w-5 text-white"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                            >
+                                <circle
+                                    className="opacity-25"
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                />
+                                <path
+                                    className="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8v8H4z"
+                                />
+                            </svg>
+                            <span>Joining...</span>
+                        </div>
+                    ) : (
+                        "Enter"
+                    )}
+                </button>
             </div>
         </div>
     );

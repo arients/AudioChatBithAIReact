@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import socket from './socket.jsx';
+import socket from '../socket.jsx';
 
 const Menu = () => {
     const navigate = useNavigate();
